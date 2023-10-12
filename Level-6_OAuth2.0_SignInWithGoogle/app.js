@@ -25,14 +25,15 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-mongoose.connect("mongodb://127.0.0.1:27017/userDB_14", { useNewUrlParser: true });
+mongoose.connect("mongodb://127.0.0.1:27017/userDB_15", { useNewUrlParser: true });
 
 const userSchema = new mongoose.Schema({
 
     email: String,
     password: String,
-    username:String,
-    googleId: String
+    username: String,
+    googleId: String,
+    secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -46,10 +47,10 @@ passport.use(User.createStrategy());
 passport.serializeUser((user, done) => {
     done(null, user.id);
 });
-  
-  passport.deserializeUser(function(obj, cb) {
+
+passport.deserializeUser(function (obj, cb) {
     cb(null, obj);
-  });
+});
 
 passport.use(new GoogleStrategy({
     clientID: process.env.CLIENT_ID,
@@ -86,12 +87,41 @@ app.get("/login", (req, res) => {
     res.render("login.ejs");
 });
 
-app.get("/secrets", (req, res) => {
+// app.get("/secrets", (req, res) => {
+//     if (req.isAuthenticated()) {
+//         res.render("secrets.ejs");
+//     } else {
+//         res.redirect("/login");
+//     }
+// });
+
+app.get("/secrets",(req,res)=>{
+
+    User.find({"secret":{$ne:null}}).then((foundUser)=>{
+        if(foundUser){
+            res.render("secrets.ejs", {userWithSecrets: foundUser});
+        }
+    }).catch((err)=>{
+        console.log(err);
+    });
+});
+
+app.get("/submit", (req, res) => {
     if (req.isAuthenticated()) {
-        res.render("secrets.ejs");
+        res.render("submit.ejs");
     } else {
         res.redirect("/login");
     }
+});
+
+app.get("/logout", (req, res) => {
+    req.logout((err)=>{
+        if(err){
+            return next(err);
+        }else{
+            res.redirect("/");
+        }
+    });
 });
 
 app.post("/register", (req, res) => {
@@ -126,6 +156,24 @@ app.post("/login", (req, res) => {
         }
     });
 
+});
+
+app.post("/submit", (req, res) => {
+    const submitedsecret = req.body.secret;
+    console.log("submitedsecret",submitedsecret)
+    console.log("req.user",req)
+
+    User.findById(req.user).then((foundUser) => {
+        console.log("foundUser",foundUser)
+        foundUser.secret = submitedsecret;
+        foundUser.save().then(() => {
+            res.redirect("/secrets");
+        }).catch((err) => {
+            console.log(err);
+        });
+    }).catch((err) => {
+        console.log(err);
+    });
 });
 
 app.listen(port, () => {
